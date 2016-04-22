@@ -36,6 +36,9 @@ import android.view.View;
 import android.view.ViewGroup.LayoutParams;
 import android.view.animation.Interpolator;
 import android.widget.LinearLayout;
+import android.widget.TextView;
+
+import org.w3c.dom.Text;
 
 /**
  * Numeric wheel view.
@@ -128,6 +131,7 @@ public class WheelView extends View {
 	 */
 	private void initData(Context context) {
 	    scroller = new WheelScroller(getContext(), scrollingListener);
+		addChangingListener(wheelChangedListener);
 	}
 	
 	// Scrolling listener
@@ -138,9 +142,9 @@ public class WheelView extends View {
         }
         
         public void onScroll(int distance) {
-            doScroll(distance);
-            
-            int height = getHeight();
+			doScroll(distance);
+
+			int height = getHeight();
             if (scrollingOffset > height) {
                 scrollingOffset = height;
                 scroller.stopScrolling();
@@ -166,6 +170,13 @@ public class WheelView extends View {
             }
         }
     };
+
+	OnWheelChangedListener wheelChangedListener = new OnWheelChangedListener() {
+		@Override
+		public void onChanged(WheelView wheel, int oldValue, int newValue) {
+			invalidateWheel(true);
+		}
+	};
 	
 	/**
 	 * Set the the specified scrolling interpolator
@@ -415,7 +426,7 @@ public class WheelView extends View {
             // cache all items
 	        recycle.recycleItems(itemsLayout, firstItem, new ItemsRange());         
         }
-        
+
         invalidate();
 	}
 
@@ -558,7 +569,7 @@ public class WheelView extends View {
 	        drawCenterRect(canvas);
 		}
 		
-        drawShadows(canvas);
+        //drawShadows(canvas);
 	}
 
 	/**
@@ -585,7 +596,6 @@ public class WheelView extends View {
 		canvas.translate(PADDING, - top + scrollingOffset);
 		
 		itemsLayout.draw(canvas);
-
 		canvas.restore();
 	}
 
@@ -809,8 +819,10 @@ public class WheelView extends View {
 		}
 		
 		// add views
-		int addItems = visibleItems / 2;
-		for (int i = currentItem + addItems; i >= currentItem - addItems; i--) {
+//		int addItems = visibleItems / 2;
+//		for (int i = currentItem + addItems; i >= currentItem - addItems; i--) {
+		// all items must be included to measure width correctly
+		for (int i = viewAdapter.getItemsCount()-1; i >= 0; i--){
 			if (addViewItem(i, true)) {
 			    firstItem = i;
 			}
@@ -858,16 +870,47 @@ public class WheelView extends View {
 			return null;
 		}
 		int count = viewAdapter.getItemsCount();
+		boolean isNegative = false;
+		boolean isOverflow = false;
+
 		if (!isValidItemIndex(index)) {
 			return viewAdapter.getEmptyItem(recycle.getEmptyItem(), itemsLayout);
 		} else {
-			while (index < 0) {
+			if (index < 0) {
+				isNegative = true;
 				index = count + index;
+			} else if(index >= count){
+				index = index - count;
+				isOverflow = true;
 			}
 		}
-		
-		index %= count;
-		return viewAdapter.getItem(index, recycle.getItem(), itemsLayout);
+
+		//return viewAdapter.getItem(index, recycle.getItem(), itemsLayout);
+		View itemView = viewAdapter.getItem(index, recycle.getItem(), itemsLayout);
+		if(itemView instanceof TextView){
+			TextView itemText = (TextView) itemView;
+			if(index == currentItem) {
+				itemText.setTextSize(24);
+				itemText.setAlpha(0.8f);
+			}else {
+				int diff = Math.abs(index - currentItem);
+				if(isNegative) {
+					diff = count - index + currentItem;
+				}
+				if(isOverflow) {
+					diff = index + count - currentItem;
+				}
+
+				if( diff == 1){
+					itemText.setTextSize(20);
+                    itemText.setAlpha(0.5f);
+                }else if ( diff == 2){
+					itemText.setTextSize(16);
+                    itemText.setAlpha(0.2f);
+                }
+			}
+		}
+		return itemView;
 	}
 	
 	/**
